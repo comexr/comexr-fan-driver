@@ -1,4 +1,4 @@
-# Comexr Fan Driver
+# Comexr Fan Driver (bèta)
 
 ## Installation from deb package
 ### Ubuntu and Ubuntu based distros
