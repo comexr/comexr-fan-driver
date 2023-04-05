@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Comexr FAN Control
+Comment=Comexr FAN Control remembers the last used fan profile
+Exec=/usr/bin/runner
+Terminal=false
+Type=Application
+Icon=tuxedo-control-center
+Categories=System;TrayIcon

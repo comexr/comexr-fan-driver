@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Comex FAN Control
+Comment=Comex FAN Control remembers the last used fan profile
+Exec=sudo /usr/bin/pkexec sh -c '/opt/comexio/nice/lastprofile'
+Terminal=false
+Type=Application
+Icon=tuxedo-control-center
+Categories=System;TrayIcon

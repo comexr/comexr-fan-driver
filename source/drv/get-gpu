@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if ! command -v nvidia-smi &> /dev/null
+then
+    echo "999999999" | tr -d '\n'
+    exit
+fi
+nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader | tr -d '\n'

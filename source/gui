@@ -1,0 +1,190 @@
+#! /bin/python3
+
+import gi
+import re
+import time
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk as gtk
+import os, sys
+import subprocess
+import configparser
+import asyncio
+import threading
+from threading import Thread
+from threading import Timer 
+import multiprocessing as mp
+from gi.repository import GObject as gobject
+from sys import setrecursionlimit
+import asyncio
+
+if not 'SUDO_UID' in os.environ.keys():
+  os.system("pkexec sh -c 'python3 /opt/comexio/nice/gui'")
+  sys.exit(1)
+
+try:
+    import socket
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    ## Create an abstract socket, by prefixing it with null. 
+    s.bind( '\0postconnect_gateway_notify_lock') 
+except socket.error as e:
+    error_code = e.args[0]
+    error_string = e.args[1]
+    print("Process already running (%d:%s ). Exiting") % ( error_code, error_string) 
+    sys.exit (0) 
+
+os.system("sudo chmod +x /opt/comexio/nice/lastprofile")
+os.system("sudo /opt/comexio/nice/lastprofile > /dev/null 2>&1 &")
+
+
+i = 0
+
+class Main:
+    def on_window_destroy(self, window):
+        gtk.main_quit()
+    def __init__(self):
+
+        gladeFile = "/opt/comexio/nice/gui.glade"
+        self.builder = gtk.Builder()
+        self.builder.add_from_file(gladeFile)
+        self.builder.connect_signals(self)
+        window = self.builder.get_object("main_Window")
+        window.connect("delete-event", gtk.main_quit)
+        window.show()        
+
+        defaultButton = self.builder.get_object("balancedButton")
+        defaultButton.connect("pressed", self.defaultProfile)
+
+        quietButton = self.builder.get_object("quietButton")
+        quietButton.connect("pressed", self.quietProfile)
+
+        silentButton = self.builder.get_object("coolButton")
+        silentButton.connect("pressed", self.coolProfile)
+
+        coolButton = self.builder.get_object("coolButton")
+        coolButton.connect("pressed", self.coolProfile)
+
+        freezyButton = self.builder.get_object("freezyButton")
+        freezyButton.connect("pressed", self.freezyProfile)
+        
+        with open('/opt/comexio/nice/lastprofile_title', 'r') as file:
+            data = file.read()
+        lastprf = self.builder.get_object("fan_profile")
+        lastprf.set_text(data)
+
+        def calc():
+            while True:
+                try:
+                    ###### Getting GPU temperature ######
+                    output = subprocess.check_output("/opt/comexio/nice/drv/./get-gpu", shell=True)
+                    label = self.builder.get_object("gpu_temp")
+                    gpu_temp = ', '.join(re.findall('[0-9]+', str(output)))
+                    if gpu_temp == "999999999":
+                        gpu_temp_logo = self.builder.get_object("appLogo3")
+                        gpu_fan_logo = self.builder.get_object("appLogo4")
+                        gpu_fan_label = self.builder.get_object("gpu_fan_label")
+                        gpu_temp_label = self.builder.get_object("gpu_temp_label")
+                        gpu_temp_value_label = self.builder.get_object("gpu_temp")
+                        gpu_fan_value_label = self.builder.get_object("gpu_fan")
+                        
+                        gpu_temp_logo.hide()
+                        gpu_fan_logo.hide()
+                        gpu_fan_label.hide()
+                        gpu_temp_label.hide()
+                        gpu_temp_value_label.hide()
+                        gpu_fan_value_label.hide()
+
+                    else:
+                        label.set_text(gpu_temp + "°C")
+
+                    ###### Getting CPU temperature ######
+                    output1 = subprocess.check_output("/opt/comexio/nice/drv/./get-temp", shell=True)
+                    label1 = self.builder.get_object("cpu_temp")
+                    cpu_temp = ', '.join(re.findall('[0-9]+', str(output1)))
+                    cpu_temp_check = cpu_temp.isnumeric()
+                    if cpu_temp_check == True:
+                        if cpu_temp == "0":
+                            print("Driver overflow. Reviving . . .")
+                        else:
+                            label1.set_text(cpu_temp + "°C")
+                    else:
+                        print("CPU Temp is not a numerical value. Reviving . . .\n")
+
+                    ###### Getting GPU fan duty ######
+                    output2 = subprocess.check_output("/opt/comexio/nice/drv/./gpu_bound", shell=True)
+                    label2 = self.builder.get_object("gpu_fan")
+                    gpu_fan = ', '.join(re.findall('[0-9]+', str(output2)))
+                    label2.set_text(gpu_fan + "%")
+
+                    ###### Getting CPU fan duty ######
+                    output3 = subprocess.check_output("/opt/comexio/nice/drv/./cpu_bound", shell=True)
+                    label3 = self.builder.get_object("cpu_fan")
+                    cpu_fan = ', '.join(re.findall('[0-9]+', str(output3)))
+                    label3.set_text(cpu_fan + "%")
+
+                    time.sleep(0.5)
+                except Exception as e:
+                    print("The GUI tried to freeze. Reviving . . .\n")
+                    continue
+  
+        thread = threading.Thread(target=calc)
+
+        thread.start()
+
+    def defaultProfile(self, widget):
+        try:
+            os.system("sudo kill $(ps aux | grep -E -w 'freezy|balanced|cool|quiet|silent|lastprofile' | awk '{print $2}') > /dev/null 2>&1")
+            #os.system("sudo /opt/comexio/nice/balanced.sh > /dev/null 2>&1 &") #########################################
+            os.system("echo 'sudo /opt/comexio/nice/balanced.sh' > /opt/comexio/nice/lastprofile")
+            os.system("echo 'Select the fan profile\n\nCurrent profile:\nBALANCED' > /opt/comexio/nice/lastprofile_title")
+            lastprf = self.builder.get_object("fan_profile")
+            lastprf.set_text("Select the fan profile\n\nCurrent profile:\nBALANCED")
+            os.system("sudo /opt/comexio/nice/balanced.sh &")
+        except Exception as e:
+            print("internal application error")
+            print (e)
+
+    def quietProfile(self, widget):
+        try:
+            os.system("sudo kill $(ps aux | grep -E -w 'freezy|balanced|cool|quiet|silent|lastprofile' | awk '{print $2}') > /dev/null 2>&1")
+            #os.system("sudo /opt/comexio/nice/quiet.sh > /dev/null 2>&1 &") #########################################
+            os.system("echo 'sudo /opt/comexio/nice/quiet.sh' > /opt/comexio/nice/lastprofile")
+            os.system("echo 'Select the fan profile\n\nCurrent profile: \nQUIET' > /opt/comexio/nice/lastprofile_title")
+            lastprf = self.builder.get_object("fan_profile")
+            lastprf.set_text("Select the fan profile\n\nCurrent profile: \nQUIET")
+            os.system("sudo /opt/comexio/nice/quiet.sh &")
+        except Exception as e:
+            print("internal application error")
+            print (e)
+
+    def coolProfile(self, widget):
+        try:
+            os.system("sudo kill $(ps aux | grep -E -w 'freezy|balanced|cool|quiet|silent|lastprofile' | awk '{print $2}') > /dev/null 2>&1")
+            #os.system("sudo /opt/comexio/nice/cool.sh > /dev/null 2>&1 &") #########################################
+            os.system("echo 'sudo /opt/comexio/nice/cool.sh' > /opt/comexio/nice/lastprofile")
+            os.system("echo 'Select the fan profile\n\nCurrent profile: \nCOOL' > /opt/comexio/nice/lastprofile_title")
+            lastprf = self.builder.get_object("fan_profile")
+            lastprf.set_text("Select the fan profile\n\nCurrent profile: \nCOOL")
+            os.system("sudo /opt/comexio/nice/cool.sh &")
+        except Exception as e:
+            print("internal application error")
+            print (e)
+
+    def freezyProfile(self, widget):
+        try:
+            os.system("sudo kill $(ps aux | grep -E -w 'freezy|balanced|cool|quiet|silent|lastprofile' | awk '{print $2}') > /dev/null 2>&1")
+            #os.system("sudo /opt/comexio/nice/freezy.sh > /dev/null 2>&1 &") #########################################
+            os.system("echo 'sudo /opt/comexio/nice/freezy.sh' > /opt/comexio/nice/lastprofile")
+            os.system("echo 'Select the fan profile\n\nCurrent profile: \nPERFORMANCE' > /opt/comexio/nice/lastprofile_title")
+            lastprf = self.builder.get_object("fan_profile")
+            lastprf.set_text("Select the fan profile\n\nCurrent profile: \nPERFORMANCE")
+            os.system("sudo /opt/comexio/nice/freezy.sh &")
+        except Exception as e:
+            print("internal application error")
+            print (e)
+
+
+
+if __name__ == '__main__':
+    main = Main()
+    gtk.main()
+
